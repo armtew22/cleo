@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.cache/
+cache/
+data/test_clips/*.mp4
+!data/test_clips/.gitkeep
+*.json
+!pyproject.toml
+forecast.json
+out/

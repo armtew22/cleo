@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cleo"
+version = "0.1.0"
+description = "Sensory-load forecast for autistic adults — TRIBE v2 cortical pipeline"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "nilearn>=0.10.4",
+    "nibabel>=5.2",
+    "anthropic>=0.40",
+    "ffmpeg-python>=0.2",
+    "pandas>=2.0",
+]
+
+[project.scripts]
+cleo-forecast = "cleo.forecast:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
