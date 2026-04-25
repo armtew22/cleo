@@ -1,7 +1,12 @@
-"""Pydantic schemas for the Phase A HTTP surface (multipart only)."""
+"""Pydantic schemas for the HTTP surface.
+
+Phase A: HealthResponse, ReportResponse (multipart-only Report payload).
+Phase B: SubmitResponse (202 body), JobStatusResponse, ErrorEnvelope, ErrorInfo.
+"""
 from __future__ import annotations
 
-from typing import Optional
+from datetime import datetime
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -31,3 +36,35 @@ class HealthResponse(BaseModel):
     status: str
     inference: str
     out_dir: str
+
+
+# ---------------------------------------------------------- Phase B schemas
+
+class SubmitResponse(BaseModel):
+    """202 Accepted body for async POST /v1/runs."""
+    model_config = ConfigDict(extra="ignore")
+
+    job_id: str
+    status: Literal["queued"] = "queued"
+
+
+class ErrorInfo(BaseModel):
+    code: str
+    message: str
+
+
+class JobStatusResponse(BaseModel):
+    """Body for GET /v1/runs/{job_id}.
+
+    `report` is populated only when status == "done".
+    `error` is populated only when status == "failed".
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    job_id: str
+    status: Literal["queued", "running", "done", "failed", "cancelled"]
+    submitted_at: datetime
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    report: Optional[ReportResponse] = None
+    error: Optional[ErrorInfo] = None

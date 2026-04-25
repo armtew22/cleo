@@ -61,3 +61,60 @@ def test_client(tmp_path, monkeypatch) -> TestClient:
     app = get_app()
     with TestClient(app) as client:
         yield client
+
+
+@pytest.fixture
+def test_client_paused_worker(tmp_path, monkeypatch):
+    """Like `test_client` but the worker is paused on a gate so jobs stay
+    in `queued` for the duration of the test. The fixture yields
+    `(client, resume)`; the test calls `resume()` to release the worker
+    (typically inside a `try/finally`).
+
+    Queue depth is set to 2 so the queue-full test can saturate it cheaply.
+    """
+    import asyncio as _asyncio
+    from tribe_backend.api import worker as worker_mod
+
+    monkeypatch.setenv("TRIBE_INFERENCE", "fake")
+    monkeypatch.setenv("OUT_DIR", str(tmp_path / "out"))
+    monkeypatch.setenv("CORS_ALLOW_ORIGINS", "*")
+    monkeypatch.setenv("TRIBE_QUEUE_DEPTH", "2")
+
+    real_run_worker = worker_mod.run_worker
+    gate_holder: dict = {}
+
+    async def gated_run_worker(store, process_window, stop, **kw):
+        gate = _asyncio.Event()
+        gate_holder["gate"] = gate
+        gate_holder["loop"] = _asyncio.get_running_loop()
+        gate_task = _asyncio.create_task(gate.wait())
+        stop_task = _asyncio.create_task(stop.wait())
+        try:
+            done, pending = await _asyncio.wait(
+                {gate_task, stop_task}, return_when=_asyncio.FIRST_COMPLETED
+            )
+        except _asyncio.CancelledError:
+            for t in (gate_task, stop_task):
+                t.cancel()
+            raise
+        for t in pending:
+            t.cancel()
+        if stop.is_set():
+            return
+        return await real_run_worker(store, process_window, stop, **kw)
+
+    monkeypatch.setattr(worker_mod, "run_worker", gated_run_worker)
+
+    from tribe_backend.api.app import get_app
+    app = get_app()
+
+    def resume():
+        gate = gate_holder.get("gate")
+        loop = gate_holder.get("loop")
+        if gate and loop and loop.is_running():
+            loop.call_soon_threadsafe(gate.set)
+        elif gate:
+            gate.set()
+
+    with TestClient(app) as client:
+        yield client, resume

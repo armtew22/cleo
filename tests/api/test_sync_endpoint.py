@@ -37,16 +37,17 @@ def test_submit_missing_text_returns_422(test_client, tiny_synthetic_mp4):
     assert body["error"]["code"] == "validation_error"
 
 
-def test_submit_wait_false_returns_400(test_client, tiny_synthetic_mp4):
+def test_submit_wait_false_returns_202(test_client, tiny_synthetic_mp4):
+    """Phase B: wait=false (default) is async — returns 202 + job_id."""
     r = test_client.post(
         "/v1/runs",
         files={"media": ("tiny.mp4", tiny_synthetic_mp4, "video/mp4")},
         data={"text": "hi", "wait": "false"},
     )
-    assert r.status_code == 400
+    assert r.status_code == 202
     body = r.json()
-    assert body["error"]["code"] == "async_not_implemented"
-    assert "Phase B" in body["error"]["message"]
+    assert body["status"] == "queued"
+    assert "job_id" in body
 
 
 def test_submit_non_mp4_content_type_rejected(test_client):
