@@ -32,18 +32,40 @@ DEFAULT_CACHE_DIR = Path(
     os.environ.get("TRIBE_BACKEND_CACHE", Path.home() / ".cache" / "tribe_backend")
 )
 
+# In-repo bundled Glasser-360 atlas. The fsaverage5 annot files (10242 verts/hemi)
+# are produced by subsampling the standard fsaverage HCP-MMP1.annot; the canonical
+# icosahedron hierarchy guarantees fsaverage5 = first 10242 vertices of fsaverage.
+_REPO_ATLAS_DIR = Path(__file__).resolve().parents[2] / "data" / "atlases" / "glasser"
+
 
 def _resolve_glasser_paths() -> tuple[Path, Path] | None:
     """Return (lh_annot, rh_annot) paths if they exist, else None.
 
-    Looks under DEFAULT_CACHE_DIR/glasser/ for files named
-    `lh.HCP-MMP1.annot` and `rh.HCP-MMP1.annot`. Override with the
-    TRIBE_GLASSER_LH / TRIBE_GLASSER_RH env vars.
+    Search order:
+      1. TRIBE_GLASSER_LH / TRIBE_GLASSER_RH env vars (explicit override).
+      2. <repo>/data/atlases/glasser/{lh,rh}.HCP-MMP1.annot (bundled).
+      3. ~/.cache/tribe_backend/glasser/{lh,rh}.HCP-MMP1.annot (user cache).
+    Returns the first pair where both files exist.
     """
-    lh = Path(os.environ.get("TRIBE_GLASSER_LH", DEFAULT_CACHE_DIR / "glasser" / "lh.HCP-MMP1.annot"))
-    rh = Path(os.environ.get("TRIBE_GLASSER_RH", DEFAULT_CACHE_DIR / "glasser" / "rh.HCP-MMP1.annot"))
-    if lh.is_file() and rh.is_file():
-        return lh, rh
+    candidates: list[tuple[Path, Path]] = []
+
+    env_lh = os.environ.get("TRIBE_GLASSER_LH")
+    env_rh = os.environ.get("TRIBE_GLASSER_RH")
+    if env_lh and env_rh:
+        candidates.append((Path(env_lh), Path(env_rh)))
+
+    candidates.append((
+        _REPO_ATLAS_DIR / "lh.HCP-MMP1.annot",
+        _REPO_ATLAS_DIR / "rh.HCP-MMP1.annot",
+    ))
+    candidates.append((
+        DEFAULT_CACHE_DIR / "glasser" / "lh.HCP-MMP1.annot",
+        DEFAULT_CACHE_DIR / "glasser" / "rh.HCP-MMP1.annot",
+    ))
+
+    for lh, rh in candidates:
+        if lh.is_file() and rh.is_file():
+            return lh, rh
     return None
 
 
