@@ -12,9 +12,11 @@ import numpy as np
 
 from tribe_backend.contracts import (
     CORTICAL_VERTICES,
+    EXPECTED_T_PER_30S_WINDOW,
     SUBCORTICAL_VOXELS,
     TribeOutput,
 )
+import warnings
 
 from .atlas import load_glasser_cortical, load_harvard_oxford_subcortical
 
@@ -128,3 +130,80 @@ class GlasserParcellationUnit:
             else:
                 out[name] = arr[:, mask].mean(axis=1).astype(np.float32)
         return out
+
+    # -- layer 2: aggregate --------------------------------------------------
+    _AGG_METHODS = ("window_mean", "peak", "peak_window")
+
+    def aggregate(
+        self,
+        series: dict[str, np.ndarray],
+        *,
+        method: str = "window_mean",
+        peak_window_radius: int = 2,
+    ) -> dict[str, float]:
+        """Reduce per-region time series to a single z-score per region.
+
+        method:
+            "window_mean" (DEFAULT)  mean across all timesteps.
+            "peak"                   max-abs across timesteps (signed value preserved).
+            "peak_window"            mean of a (2r+1) frame window around |peak|.
+
+        Emits WindowSizeWarning when input T != EXPECTED_T_PER_30S_WINDOW.
+        """
+        if method not in self._AGG_METHODS:
+            raise ValueError(
+                f"unknown aggregate method {method!r}; expected one of {self._AGG_METHODS}"
+            )
+        if not series:
+            return {}
+        # All series share the same T.
+        T = next(iter(series.values())).shape[0]
+        if T != EXPECTED_T_PER_30S_WINDOW:
+            warnings.warn(
+                f"aggregate received T={T}; expected {EXPECTED_T_PER_30S_WINDOW} "
+                f"(1 Hz over a 30s window inclusive of t=0 and t=30). "
+                f"Aggregation will proceed but results may be partial.",
+                WindowSizeWarning,
+                stacklevel=2,
+            )
+
+        out: dict[str, float] = {}
+        for name, ts in series.items():
+            if method == "window_mean":
+                out[name] = float(ts.mean())
+            elif method == "peak":
+                idx = int(np.argmax(np.abs(ts)))
+                out[name] = float(ts[idx])
+            elif method == "peak_window":
+                # Find the (2r+1)-frame window with the largest |mean|.
+                w = 2 * peak_window_radius + 1
+                if T <= w:
+                    out[name] = float(ts.mean())
+                else:
+                    # Sliding window mean via cumulative sum.
+                    csum = np.concatenate(([0.0], np.cumsum(ts, dtype=np.float64)))
+                    means = (csum[w:] - csum[:-w]) / w
+                    best = int(np.argmax(np.abs(means)))
+                    out[name] = float(means[best])
+        return out
+
+    # -- layer 3: rank -------------------------------------------------------
+    def rank_and_threshold(
+        self,
+        aggregated: dict[str, float],
+        *,
+        top_k: int = 10,
+        z_threshold: float = 1.5,
+    ) -> list[tuple[str, float]]:
+        """Return [(name, z_value), ...] sorted descending by |z|, filtered by threshold.
+
+        Both positive activations and strong negative deactivations are ranked
+        by absolute magnitude; the original (signed) value is returned.
+        """
+        survivors = [
+            (name, float(val))
+            for name, val in aggregated.items()
+            if abs(val) >= z_threshold
+        ]
+        survivors.sort(key=lambda nv: abs(nv[1]), reverse=True)
+        return survivors[:top_k]
