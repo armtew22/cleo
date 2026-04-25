@@ -10,6 +10,10 @@ dependencies = [
     "nilearn>=0.10",
     "matplotlib>=3.8",
     "trimesh>=4.0",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "python-multipart>=0.0.9",
+    "opencv-python-headless>=4.8",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +23,7 @@ dev = [
     "pytest-cov>=5.0",
     "hypothesis>=6.100",
     "import-linter>=2.0",
+    "httpx>=0.27",
 ]
 
 [build-system]
@@ -65,3 +70,23 @@ name = "Mesh does not import parcellation or inference"
 type = "forbidden"
 source_modules = ["tribe_backend.mesh"]
 forbidden_modules = ["tribe_backend.parcellation", "tribe_backend.inference"]
+
+[[tool.importlinter.contracts]]
+name = "API talks only to control + contracts"
+type = "forbidden"
+source_modules = ["tribe_backend.api"]
+forbidden_modules = [
+    "tribe_backend.parcellation",
+    "tribe_backend.mesh",
+    "tribe_backend.inference",
+]
+# control/ is the composition root and legitimately imports all three
+# compartments. The api/ rule is about *direct* imports — it must reach
+# inference/parcellation/mesh only through control. Ignore the indirect
+# paths that go through tribe_backend.control.
+ignore_imports = [
+    "tribe_backend.control.factory -> tribe_backend.inference",
+    "tribe_backend.control.factory -> tribe_backend.inference.protocol",
+    "tribe_backend.control.factory -> tribe_backend.mesh",
+    "tribe_backend.control.factory -> tribe_backend.parcellation",
+]
