@@ -29,7 +29,12 @@ let package = Package(
         .testTarget(
             name: "TribeBrainViewTests",
             dependencies: ["TribeBrainView"],
-            path: "Tests/TribeBrainViewTests"
+            path: "Tests",
+            exclude: ["TribeBrainViewUITests"],
+            sources: ["TribeBrainViewTests"],
+            resources: [
+                .copy("Fixtures"),
+            ]
         ),
         .testTarget(
             name: "TribeBrainViewUITests",
