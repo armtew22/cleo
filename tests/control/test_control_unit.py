@@ -215,7 +215,7 @@ def test_backpressure_does_not_deadlock_with_blocking_poller(tmp_path: Path) -> 
             return w
 
     poller = BlockingPoller(_three_windows())
-    unit, *_ = _make_control(tmp_path, poller=poller)
+    unit, *_ = _make_control(tmp_path, poller=poller, backpressure_max_lag=1)
     bundles = list(unit.run_stream(poller))
     assert [b.window_id for b in bundles] == ["w-0", "w-1", "w-2"]
     assert unit.dropped_count == 0

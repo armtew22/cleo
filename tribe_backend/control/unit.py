@@ -205,54 +205,6 @@ class ControlUnit:
                 "backpressure: dropped %d stale window(s)", dropped
             )
 
-    def _drain_to_freshest(
-        self, it: Iterator[StimulusWindow], head: StimulusWindow
-    ) -> StimulusWindow | None:
-        """Non-blocking peek: if more windows are immediately available,
-        drop everything except the newest. Stops as soon as the iterator
-        would block (we detect this via a `try_next` hook or by attempting
-        next() with the assumption it raises StopIteration when empty).
-
-        For pollers that block until a window is available (real cameras),
-        we never drain past the head — backpressure only fires when the
-        poller is *ready* to deliver a fresher window.
-        """
-        # We must not block here. Many pollers block in __next__. We only
-        # drain when the poller exposes `pending()` -> int (count of buffered
-        # windows). If it doesn't, we just return head untouched.
-        pending_fn = getattr(it, "pending", None)
-        if not callable(pending_fn):
-            return head
-        try:
-            n = int(pending_fn())
-        except Exception:  # pragma: no cover
-            return head
-        if n <= self._backpressure_max_lag:
-            return head
-        # Drain.
-        freshest = head
-        drained = 0
-        while True:
-            try:
-                n_now = int(pending_fn())
-            except Exception:  # pragma: no cover
-                break
-            if n_now == 0:
-                break
-            try:
-                freshest = next(it)
-            except StopIteration:
-                break
-            drained += 1
-        if drained:
-            self._dropped_count += drained
-            logger.warning(
-                "backpressure: dropped %d stale window(s); advancing to %s",
-                drained,
-                freshest.window_id,
-            )
-        return freshest
-
     def _process(self, window: StimulusWindow) -> Bundle:
         """Inference -> parcellation + mesh fan-out, with failure isolation."""
         out = self._inference(window)
