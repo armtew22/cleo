@@ -30,10 +30,11 @@ Rules:
 
 USER_INSTRUCTION = (
     "These frames are sampled from a 30-second clip of a physical space. "
-    "Write one paragraph describing the space using only objective observables. "
-    "Cover lighting, surfaces, density and arrangement of people, visible motion, "
-    "and any audio cues you can infer from visual evidence (e.g., visible speakers, "
-    "musicians, machinery)."
+    "Synthesize them into one paragraph describing the space using only objective "
+    "observables. Cover lighting, surfaces, density and arrangement of people, "
+    "visible motion, and any audio cues you can infer from visual evidence (e.g., "
+    "visible speakers, musicians, machinery). Ignore any frames that are heavily "
+    "motion-blurred or out of focus — rely on the sharp frames for detail."
 )
 
 
@@ -80,7 +81,7 @@ def sample_frames(video_path: Path, n: int, out_dir: Path) -> list[Path]:
     return paths
 
 
-def caption_clip(video_path: Path, n_frames: int = 5) -> str:
+def caption_clip(video_path: Path, n_frames: int = 8) -> str:
     """Return a single objective paragraph describing the scene."""
     import anthropic  # lazy: keeps pipeline math importable without the SDK
 
