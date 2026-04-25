@@ -242,6 +242,68 @@ def get_run(request: Request, job_id: str):
 # Mesh artifact endpoints: per-job manifest + four GETs serving the binary
 # / JSON files written by ControlUnit's mesh exporter.
 
+def _resolve_artifact_path(request: Request, job_id: str, name: str):
+    """Run the full job → window_id → on-disk path resolution chain.
+
+    Raises APIError on any of the documented failure modes:
+        - 404 JOB_NOT_FOUND        (unknown / unsafe job_id)
+        - 409 JOB_NOT_READY        (still queued or running)
+        - 410 JOB_FAILED           (failed or cancelled)
+        - 500 INFERENCE_ARTIFACTS_MISSING (done but missing on disk)
+    """
+    job = _fetch_job(request, job_id)
+    window_id = _require_done_job(job)
+
+    settings = get_settings(request)
+    try:
+        path = _artifacts.artifact_path(settings.out_dir, window_id, name)
+    except _artifacts.UnsafeArtifactRequest:
+        # window_id should already be safe (it comes from our own ControlUnit
+        # output), but treat it as 404 if it's not — defense in depth.
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="JOB_NOT_FOUND",
+            message=f"unknown job_id {job_id!r}",
+        )
+    if not path.is_file():
+        raise APIError(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            code=CODE_INFERENCE_ARTIFACTS_MISSING,
+            message=f"artifact {name!r} for job {job.job_id} not present on disk",
+        )
+    return path
+
+
+@router.get("/runs/{job_id}/mesh/meta")
+def get_mesh_meta(request: Request, job_id: str):
+    """Parsed brain_meta.json for the job. JSON; no caching (in-flight ref)."""
+    path = _resolve_artifact_path(request, job_id, "brain_meta.json")
+    body = _json.loads(path.read_text())
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=body,
+        headers={"Cache-Control": _artifacts.JSON_CACHE_HEADER},
+    )
+
+
+@router.get("/runs/{job_id}/mesh/colors")
+def get_mesh_colors(request: Request, job_id: str):
+    path = _resolve_artifact_path(request, job_id, "brain_colors.bin")
+    return _artifacts.binary_file_response(path, "brain_colors.bin")
+
+
+@router.get("/runs/{job_id}/mesh/vertices")
+def get_mesh_vertices(request: Request, job_id: str):
+    path = _resolve_artifact_path(request, job_id, "brain_vertices.bin")
+    return _artifacts.binary_file_response(path, "brain_vertices.bin")
+
+
+@router.get("/runs/{job_id}/mesh/faces")
+def get_mesh_faces(request: Request, job_id: str):
+    path = _resolve_artifact_path(request, job_id, "brain_faces.bin")
+    return _artifacts.binary_file_response(path, "brain_faces.bin")
+
+
 @router.get("/runs/{job_id}/mesh", response_model=MeshManifest)
 def get_mesh_manifest(request: Request, job_id: str):
     """Per-job artifact manifest. Requires status == done."""
