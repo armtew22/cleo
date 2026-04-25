@@ -1,0 +1,16 @@
+{
+  "format": "tribe_brain_mesh_v1",
+  "surface": "fsaverage5",
+  "surface_type": "pial",
+  "vertex_count": 20484,
+  "face_count": 40960,
+  "bytes_per_vertex": 12,
+  "bytes_per_face": 12,
+  "bytes_per_color": 4,
+  "files": {
+    "vertices": "brain_vertices.bin",
+    "faces": "brain_faces.bin",
+    "colors": "brain_colors.bin"
+  },
+  "window_id": "fixture-seed42"
+}

@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from tribe_backend.api import worker as worker_mod
 from tribe_backend.api.errors import install_handlers
 from tribe_backend.api.jobs import JobStore
+from tribe_backend.api.mesh_routes import mesh_router
 from tribe_backend.api.routes import router
 from tribe_backend.api.settings import Settings
 from tribe_backend.control.factory import build_inference, default_control_unit
@@ -113,4 +114,5 @@ def get_app() -> FastAPI:
 
     install_handlers(app)
     app.include_router(router)
+    app.include_router(mesh_router)
     return app
