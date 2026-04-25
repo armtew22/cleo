@@ -300,6 +300,8 @@ Marked `@pytest.mark.gpu`, only run on the box with weights.
 
 **Deliverables:** `Settings.inference="gpu"` path, `--workers 1` enforced (assert at startup). README snippet for running.
 
+**Post-startup deliverable (deploy-time):** After uvicorn starts, run `scripts/generate-usage-report.py` which probes the running server (GET `/healthz`, GET `/openapi.json`) and writes the populated report to `agent/reports/backend-usage-{date}.md`, with `{CLUSTER_HOST}:{PORT}` already filled in (resolved via the §9 discovery procedure). The script must fail loudly if either probe fails — a missing or unreachable server means the report would mislead the frontend team.
+
 ---
 
 ## §5 Integration & User Flow Walkthrough
@@ -351,6 +353,7 @@ evt.addEventListener("done", async () => {
 - Phase-E GPU smoke test passes on the A6000 box (run manually before declaring done).
 - No regression in existing `tests/` suite.
 - README section added under `tribe_backend/api/README.md` documenting env vars, dev run, and curl examples.
+- The populated frontend usage report exists at `agent/reports/backend-usage-{YYYY-MM-DD}.md` with the actual cluster URL filled in, and a frontend dev unfamiliar with the project can successfully POST a video and receive a Report by following only the report's instructions.
 
 ---
 
@@ -398,6 +401,198 @@ Confirm whether `imageio-ffmpeg` or `pyav` is already a transitive dep before ad
 3. Does `out_dir` already namespace per-window via `window_id`? If yes, we map `job_id → window_id` 1:1 and reuse the directory. If no, we add a `job_id` directory layer.
 4. Confirm `InferenceFailure` is the only domain-specific exception raised by `process_window`. If there are others (parcellation errors, mesh export errors), each needs an explicit error mapping.
 5. What is the expected max `media` upload size? Sets the multipart spool threshold and the nginx/ingress config in front of uvicorn.
+
+---
+
+## §9 Frontend Usage Report
+
+After the API is implemented and uvicorn is running on the Slurm box, the project must produce a **standalone, self-contained document** that the frontend team can consume without ever reading this plan, the source code, or the OpenAPI schema. The document lives at:
+
+```
+agent/reports/backend-usage-{YYYY-MM-DD}.md
+```
+
+It is generated at deploy time (not plan time) by `scripts/generate-usage-report.py`, which probes the live server (`GET /v1/health`, `GET /openapi.json`) and renders a markdown file from a template with all placeholders resolved. The frontend dev opens this one file and can immediately curl, fetch, or wire up an `EventSource`.
+
+### §9.1 Deploy-time URL discovery (Slurm cluster)
+
+**The deployment URL is not `http://localhost:8000`.** This codebase runs inside a Slurm allocation on a compute node whose hostname is only known at run time. The frontend cannot reach the compute node directly without knowing the routing topology (head node? SSH tunnel? reverse proxy?). The report generator must resolve `{CLUSTER_HOST}:{PORT}` to a real, reachable address before writing the report.
+
+**Discovery procedure** (executed by the operator when running `scripts/generate-usage-report.py`, *not* baked into this plan):
+
+1. **Identify the compute node** the API is bound to:
+   ```bash
+   # Inside the Slurm job that runs uvicorn:
+   echo "$SLURM_JOB_NODELIST"                          # e.g., "gpu-node-07"
+   scontrol show node "$(hostname)" | grep NodeAddr    # e.g., "NodeAddr=10.32.4.7"
+   squeue -u "$USER" --states=R -h -o "%N %B"          # confirm node + batch host
+   ```
+2. **Determine the access pattern** the frontend will use. Document whichever applies for this cluster — the operator confirms by trying each in order:
+   - **Direct from frontend network**: if compute nodes are routable from the frontend's LAN/VPN (rare on shared HPC), use `NodeAddr:PORT` directly.
+   - **SSH local-port-forward tunnel**: most common for HPC. Frontend dev runs `ssh -L 8000:gpu-node-07:8000 head.cluster.example` and uses `http://localhost:8000`. The report must include the exact tunnel command with the resolved node name substituted in.
+   - **Head/login-node reverse proxy**: if a head node fronts compute (e.g., nginx on `head.cluster.example` proxying `/tribe/ → gpu-node-07:8000`), document the public URL `https://head.cluster.example/tribe/` and confirm CORS + path-prefix are configured.
+3. **Fill the placeholder.** The report template carries a literal `{CLUSTER_HOST}:{PORT}` token; the generator replaces it with the resolved address (or, for the tunnel case, with `localhost:{LOCAL_PORT}` plus a sibling "Tunnel setup" subsection containing the exact `ssh -L ...` command).
+4. **Sanity-check.** The generator must `curl -fsS http://{CLUSTER_HOST}:{PORT}/v1/health` from the same network the frontend will use, and embed the actual JSON response in the report. If the probe fails, the script aborts non-zero and the report is not written.
+
+This is a **deploy-time step, not a plan-time step.** The plan cannot know `gpu-node-07`; only the operator running the deploy script can.
+
+### §9.2 Report contents
+
+The generated `backend-usage-{date}.md` must contain the sections below, in order. Every section is rendered with concrete, resolved values — no `<TODO>` placeholders may survive into the final file.
+
+#### A. Endpoint base URL
+
+- Resolved `BASE_URL = http://{CLUSTER_HOST}:{PORT}` (or tunnel/proxy variant).
+- The exact `curl /v1/health` response captured at generation time, with the inference backend (`fake` vs `gpu`) called out.
+- If a tunnel is required: the literal `ssh -L ...` command the frontend dev runs, with the resolved compute node hostname substituted in.
+
+#### B. Request schema (two formats)
+
+For the **frontend audience**, both surfaces of `POST /v1/runs` are documented side-by-side:
+
+1. **Pydantic model** (for backend devs / contract reference) — copied verbatim from `tribe_backend/api/schemas.py::SubmitForm` and `SubmitJsonBody`.
+2. **Hand-written JSON example** (for frontend devs) showing every field, type, required/optional flag, and a realistic example value for a 30s clip.
+
+Both transports must be covered:
+
+- **`multipart/form-data`** — table with columns `field | type | required | example | notes`:
+
+  | field      | type   | required | example                          | notes                                          |
+  |------------|--------|----------|----------------------------------|------------------------------------------------|
+  | `media`    | file   | yes      | `clip.mp4` (30s, H.264, ~12 MB)  | mp4 or webm, ≤200 MB, audio track preferred    |
+  | `text`     | str    | yes      | `"The quick brown fox..."`       | UTF-8, no length cap in v1                     |
+  | `audio_sr` | int    | no       | `16000`                          | only used if `media` has no audio track        |
+  | `video_fps`| int    | no       | `25`                             | default 25                                     |
+  | `t_start`  | float  | no       | `0.0`                            | seconds                                        |
+  | `window_id`| str    | no       | `"550e8400-e29b-41d4-..."`       | server generates UUID if absent                |
+
+- **`application/json`** with base64 — full example payload for a 30s clip:
+
+  ```json
+  {
+    "video_b64": "<base64 of ~12MB mp4 — about 16MB encoded>",
+    "audio_b64": "<base64 of 30s 16kHz mono wav — about 1.3MB encoded; omit if mp4 has audio>",
+    "audio_sr": 16000,
+    "video_fps": 25,
+    "text": "The quick brown fox jumps over the lazy dog.",
+    "t_start": 0.0,
+    "window_id": "550e8400-e29b-41d4-a716-446655440000"
+  }
+  ```
+
+#### C. Response schema
+
+Full JSON shape of the `Report` returned by `GET /v1/runs/{job_id}` once `status="done"`. Every field typed, with a realistic example:
+
+```json
+{
+  "job_id": "550e8400-...",
+  "status": "done",
+  "submitted_at": "2026-04-25T14:02:11Z",
+  "started_at":   "2026-04-25T14:02:12Z",
+  "finished_at":  "2026-04-25T14:07:13Z",
+  "report": {
+    "window_id": "550e8400-...",
+    "t_start": 0.0,
+    "t_end":  30.0,
+    "top_regions": [
+      {
+        "name": "L_V1",
+        "z_score": 3.42,
+        "direction": "positive",
+        "description": "Primary visual cortex (left hemisphere) — early visual processing."
+      },
+      { "name": "R_FFA", "z_score": 2.18, "direction": "positive",
+        "description": "Right fusiform face area — face perception." }
+    ]
+  },
+  "artifacts": {
+    "mesh_meta":      "/v1/runs/{job_id}/mesh/meta",
+    "mesh_colors":    "/v1/runs/{job_id}/mesh/colors",
+    "animation_base": "/v1/runs/{job_id}/mesh/animation"
+  }
+}
+```
+
+Mesh artifact URLs are exactly the paths defined in §3 Mesh Artifacts (`mesh_meta`, `mesh_colors`, `animation/{t}`). Document content-types: `application/json` for `mesh_meta`, `application/octet-stream` for `mesh_colors` and per-frame `animation/{t}`.
+
+#### D. Worked curl examples
+
+Each example shows the command and a truncated expected output, so the frontend dev can copy-paste and verify. All URLs use the resolved `BASE_URL`.
+
+1. **Submit a job** (multipart):
+   ```bash
+   curl -X POST $BASE_URL/v1/runs \
+     -F "media=@clip.mp4" \
+     -F "text=The quick brown fox..." \
+     -F "video_fps=25"
+   # → 202
+   # { "job_id": "550e8400-...", "status": "queued",
+   #   "submitted_at": "2026-04-25T14:02:11Z" }
+   ```
+
+2. **Poll status**:
+   ```bash
+   curl $BASE_URL/v1/runs/550e8400-...
+   # → 200 { "status": "running", ... }
+   # ... ~5 min later ...
+   # → 200 { "status": "done", "report": {...}, "artifacts": {...} }
+   ```
+
+3. **Fetch the report** (same as poll once `status="done"`; section repeats the JSON shape from §9.2 C, truncated).
+
+4. **Fetch mesh meta + colors**:
+   ```bash
+   curl $BASE_URL/v1/runs/550e8400-.../mesh/meta
+   # → 200 application/json
+   # { "vertices": 20484, "hemispheres": [...], ... }
+
+   curl $BASE_URL/v1/runs/550e8400-.../mesh/colors -o brain_colors.bin
+   # → 200 application/octet-stream
+   # (binary, ~Nbytes)
+   ```
+
+#### E. CORS guidance
+
+- Default dev allowlist: `http://localhost:5173`, `http://localhost:3000`.
+- In `TRIBE_INFERENCE=gpu` (production) the allowlist is read from `settings.cors_origins` and is **empty by default** — frontend must request their origin be added.
+- How to request a change: open a PR editing `tribe_backend/api/settings.py::Settings.cors_origins` (or set the `TRIBE_CORS_ORIGINS` env var on the Slurm job) — point of contact: backend on-call.
+- Preflight: `OPTIONS` is handled by `fastapi.middleware.cors.CORSMiddleware`; the frontend should not need to do anything special beyond a normal browser fetch.
+
+#### F. Latency expectations
+
+- **Real GPU mode (`TRIBE_INFERENCE=gpu`)**: ~5 minutes per 30s clip on a single A6000. Empirically verified: **301s end-to-end** for a 30s clip at the time of report generation. Frontends must use the async path (`POST /v1/runs` → 202 → poll/SSE) — never `?wait=true` against GPU.
+- **Dev fake mode (`TRIBE_INFERENCE=fake`)**: ~instant (sub-second). `?wait=true` is acceptable and convenient for frontend integration tests.
+- Implication: any UI showing a progress indicator should plan for a 5-minute spinner with a cancellation affordance, and should hit the SSE stream (Phase D) once available rather than polling every second.
+
+#### G. Error catalog
+
+Exact HTTP status codes and JSON error shapes the frontend must handle. The shape is uniform: `{"error": {"code": "<machine-readable>", "message": "<human-readable, no traceback>"}}`.
+
+| Status | `error.code`         | When                                                     | Frontend action                                  |
+|--------|----------------------|----------------------------------------------------------|--------------------------------------------------|
+| 400    | `decode_error`       | Uploaded media isn't a valid mp4/webm                    | Show "Couldn't read your video, try re-encoding" |
+| 422    | `validation_error`   | Pydantic validation (missing `text`, bad `video_fps`)    | Show field-level message from `error.message`    |
+| 404    | `job_not_found`      | Unknown `job_id` on GET/DELETE                           | Treat as expired; restart submission             |
+| 409    | `job_not_cancelable` | DELETE on a running job                                  | Disable cancel button once status="running"      |
+| 503    | `queue_full`         | Submission past `queue_depth`                            | Show "Server busy, retry in a few minutes"       |
+| 200    | (job body `status="failed"`, `error.code="inference"`) | Inference raised `InferenceFailure` mid-run | Show "Processing failed: <message>", offer retry |
+| 200    | (job body `status="failed"`, `error.code="internal"`)  | Unhandled exception in worker             | Show generic failure + a "report this" link      |
+
+Tracebacks are **never** included; the frontend can rely on `error.message` being safe to display.
+
+### §9.3 Generator script outline
+
+`scripts/generate-usage-report.py` (referenced in Phase E):
+
+1. Read `BASE_URL` from CLI arg or env, defaulting to `http://$(scontrol show node $(hostname) | awk -F= '/NodeAddr/ {print $2}'):${PORT:-8000}`.
+2. `GET {BASE_URL}/v1/health` → embed JSON in §9.2 A; abort if non-200.
+3. `GET {BASE_URL}/v1/openapi.json` → drive the schema tables in §9.2 B and C from the live spec, so the report cannot drift from the running server.
+4. Render the markdown via a Jinja template (or f-string template) checked into `scripts/templates/backend-usage.md.j2`.
+5. Write to `agent/reports/backend-usage-$(date +%Y-%m-%d).md`. If a file for today already exists, overwrite (deploys are idempotent).
+6. Print the absolute path of the written report to stdout for the operator.
+
+The generator must fail non-zero on any probe error, schema mismatch, or unresolved `{CLUSTER_HOST}` placeholder — a partially-populated report is worse than no report.
 
 ---
 
