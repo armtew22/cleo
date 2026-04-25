@@ -157,8 +157,13 @@ class ControlUnit:
         text: str,
         video_fps: float = 30.0,
         t_start: float | None = None,
+        z_threshold: float | None = None,
     ) -> Any:
-        """One-shot user API: hand in raw media, get a parcellation Report."""
+        """One-shot user API: hand in raw media, get a parcellation Report.
+
+        `z_threshold` overrides the parcellation unit's default (1.5).
+        Lower it (e.g. 0.1) to surface the long tail of weak activations.
+        """
         # Compute duration from audio length (most reliable signal).
         n_samples = audio.shape[0]
         duration_s = float(n_samples) / float(audio_sr)
@@ -172,7 +177,7 @@ class ControlUnit:
             audio_sr=audio_sr,
             text=text,
         )
-        return self._process(window).report
+        return self._process(window, z_threshold=z_threshold).report
 
     # ----------------------------------------------------------------- private
     def _drain_pending(self, it: Iterator[StimulusWindow]) -> None:
@@ -205,7 +210,12 @@ class ControlUnit:
                 "backpressure: dropped %d stale window(s)", dropped
             )
 
-    def _process(self, window: StimulusWindow) -> Bundle:
+    def _process(
+        self,
+        window: StimulusWindow,
+        *,
+        z_threshold: float | None = None,
+    ) -> Bundle:
         """Inference -> parcellation + mesh fan-out, with failure isolation."""
         out = self._inference(window)
         # Defensive: stamp window_id if inference forgot to.
@@ -214,7 +224,8 @@ class ControlUnit:
 
         report: Any = None
         try:
-            report = self._parcellation.generate_report(out)
+            kwargs = {} if z_threshold is None else {"z_threshold": z_threshold}
+            report = self._parcellation.generate_report(out, **kwargs)
         except Exception:
             logger.exception(
                 "parcellation.generate_report failed for window_id=%s",

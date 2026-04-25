@@ -68,7 +68,7 @@ def health(settings=Depends(get_settings)) -> HealthResponse:
     )
 
 
-def _decode_request(media: UploadFile, text: str) -> dict:
+def _decode_request(media: UploadFile, text: str, z_threshold: float | None = None) -> dict:
     """Read+decode the multipart body into a payload dict the worker can call.
 
     Raises APIError(400) on bad media. Performed synchronously in the request
@@ -97,13 +97,16 @@ def _decode_request(media: UploadFile, text: str) -> dict:
     if audio.size == 0:
         audio = _silence_for(video, audio_sr)
 
-    return {
+    payload: dict = {
         "video": video,
         "audio": audio,
         "audio_sr": audio_sr,
         "text": text,
         "video_fps": fps,
     }
+    if z_threshold is not None:
+        payload["z_threshold"] = z_threshold
+    return payload
 
 
 @router.post("/runs")
@@ -112,6 +115,17 @@ def submit_run(
     media: Annotated[UploadFile, File(description="mp4 stimulus video")],
     text: Annotated[str, Form(description="caption / transcript for the window")],
     wait: Annotated[bool, Form(description="if true, return Report inline (Phase A sync mode)")] = False,
+    z_threshold: Annotated[
+        float | None,
+        Form(
+            description=(
+                "z-score threshold for ranking parcels in the report. "
+                "Default (None) uses the parcellation unit's default of 1.5. "
+                "Lower values (e.g. 0.1) surface the long tail of weak activations."
+            ),
+            ge=0.0,
+        ),
+    ] = None,
     cu: ControlUnit = Depends(get_control_unit),
 ):
     # Phase E: refuse `wait=true` in production GPU mode. A real GPU window
@@ -131,7 +145,7 @@ def submit_run(
                 ),
             )
 
-    payload = _decode_request(media, text)
+    payload = _decode_request(media, text, z_threshold=z_threshold)
 
     if wait:
         # Phase A sync path: run inline, return Report directly.
