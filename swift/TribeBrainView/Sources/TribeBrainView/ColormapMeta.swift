@@ -28,7 +28,9 @@ import Foundation
 /// this Codable surface. TODO: revisit if/when exporter starts emitting them.
 public struct ColormapMeta: Codable, Equatable {
     public let format: String
-    public let surface: String
+    /// Optional: the local-fixture exporter writes "fsaverage5"; the FastAPI
+    /// server's bootstrap tar (Phase 6b) omits this field. Treat as informational.
+    public let surface: String?
     public let surfaceType: String
     public let vertexCount: Int
     public let faceCount: Int
@@ -46,10 +48,13 @@ public struct ColormapMeta: Codable, Equatable {
     public struct Files: Codable, Equatable {
         public let vertices: String
         public let faces: String
-        public let colors: String
+        /// Optional: the server bootstrap tar (Phase 6b) ships only static
+        /// geometry files; colors arrive on the hot path. The local-fixture
+        /// exporter emits this field. Treat as informational.
+        public let colors: String?
         public let normals: String?
 
-        public init(vertices: String, faces: String, colors: String, normals: String? = nil) {
+        public init(vertices: String, faces: String, colors: String? = nil, normals: String? = nil) {
             self.vertices = vertices
             self.faces = faces
             self.colors = colors
@@ -59,7 +64,7 @@ public struct ColormapMeta: Codable, Equatable {
 
     public init(
         format: String,
-        surface: String,
+        surface: String? = nil,
         surfaceType: String,
         vertexCount: Int,
         faceCount: Int,

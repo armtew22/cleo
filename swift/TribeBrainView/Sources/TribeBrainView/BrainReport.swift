@@ -3,73 +3,70 @@
 import Foundation
 
 // MARK: - BrainReport
+//
+// Codable mirror of `tribe_backend.parcellation.unit.Report.to_json()`:
+//
+//   {
+//     "top_regions": [
+//        { "name": "...", "z_score": 2.4, "direction": "activation",
+//          "description": "..." }, ...
+//     ],
+//     "text": "Window summary: ...",
+//     "method": "window_mean",
+//     "z_threshold": 1.5,
+//     "window_id": "abc123" | null
+//   }
 
-/// Codable mirror of GlasserParcellationUnit.Report from the Python backend.
-public struct BrainReport: Codable {
-    public let windowId: String
-    public let method: String
+public struct BrainReport: Codable, Equatable {
     public let topRegions: [RegionActivation]
-    public let vmin: Double
-    public let vmax: Double
+    public let text: String
+    public let method: String
+    public let zThreshold: Double
+    public let windowId: String?
 
     public init(
-        windowId: String,
-        method: String,
         topRegions: [RegionActivation],
-        vmin: Double,
-        vmax: Double
+        text: String,
+        method: String,
+        zThreshold: Double,
+        windowId: String? = nil
     ) {
-        self.windowId = windowId
-        self.method = method
         self.topRegions = topRegions
-        self.vmin = vmin
-        self.vmax = vmax
+        self.text = text
+        self.method = method
+        self.zThreshold = zThreshold
+        self.windowId = windowId
     }
 
     private enum CodingKeys: String, CodingKey {
-        case windowId = "window_id"
-        case method
         case topRegions = "top_regions"
-        case vmin
-        case vmax
+        case text
+        case method
+        case zThreshold = "z_threshold"
+        case windowId = "window_id"
     }
 }
 
 // MARK: - RegionActivation
 
-public struct RegionActivation: Codable {
-    public let label: String
-    public let parcelId: Int
+public struct RegionActivation: Codable, Equatable {
+    public let name: String
     public let zScore: Double
-    public let strengthLabel: String
-    public let hemisphere: Hemisphere
+    /// "activation" | "deactivation".
+    public let direction: String
+    public let description: String
 
-    public init(
-        label: String,
-        parcelId: Int,
-        zScore: Double,
-        strengthLabel: String,
-        hemisphere: Hemisphere
-    ) {
-        self.label = label
-        self.parcelId = parcelId
+    public init(name: String, zScore: Double, direction: String, description: String = "") {
+        self.name = name
         self.zScore = zScore
-        self.strengthLabel = strengthLabel
-        self.hemisphere = hemisphere
+        self.direction = direction
+        self.description = description
     }
 
     private enum CodingKeys: String, CodingKey {
-        case label
-        case parcelId = "parcel_id"
+        case name
         case zScore = "z_score"
-        case strengthLabel = "strength_label"
-        case hemisphere
+        case direction
+        case description
     }
-}
-
-// MARK: - Hemisphere
-
-public enum Hemisphere: String, Codable, CaseIterable {
-    case left = "lh"
-    case right = "rh"
 }

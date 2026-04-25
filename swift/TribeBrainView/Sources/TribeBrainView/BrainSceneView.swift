@@ -59,9 +59,30 @@ public struct BrainSceneView: _PlatformViewRepresentable {
                 print("BrainSceneView: failed to load source: \(error)")
                 #endif
             }
-        case .remote:
-            // Phase 6c (Swift networking client) will bootstrap via BrainMeshClient.
-            fatalError("Phase 6c")
+        case .remote(let client):
+            // Bootstrap asynchronously: fetch (or reuse cached) static mesh,
+            // ensure a placeholder colors.bin exists (server omits it from
+            // /v1/mesh/static — colors arrive on the hot path), then load
+            // and install on the coordinator. Subsequent color updates
+            // flow through coordinator.updateColors(buffer:) once the host
+            // calls fetchColors / pollFull.
+            Task { [weak coord] in
+                guard let coord else { return }
+                do {
+                    let dir = try await client.bootstrapStaticMesh()
+                    try Self.ensurePlaceholderColors(in: dir)
+                    let assets = try BrainMeshLoader.load(
+                        BrainMeshSource(kind: .binaryDirectory(dir))
+                    )
+                    await MainActor.run {
+                        coord.setGeometry(assets.geometry, vertexCount: assets.vertexCount)
+                    }
+                } catch {
+                    #if DEBUG
+                    print("BrainSceneView: remote bootstrap failed: \(error)")
+                    #endif
+                }
+            }
         case .json, .glb:
             fatalError("unimplemented")
         }
@@ -91,6 +112,38 @@ public struct BrainSceneView: _PlatformViewRepresentable {
                 }
             }
         }
+    }
+
+    // MARK: - Remote bootstrap helpers
+
+    /// Ensure the bootstrap directory has a `brain_colors.bin` file the loader
+    /// can ingest. The server's /v1/mesh/static tar emits only vertices /
+    /// normals / faces / meta — colors arrive over /v1/inference/colors. We
+    /// drop a zero-filled placeholder (RGBA × vertex_count) so the loader can
+    /// build an SCNGeometry with a neutral color source; the first inference
+    /// response will replace it via `coordinator.updateColors(buffer:)`.
+    static func ensurePlaceholderColors(in dir: URL) throws {
+        let colorsURL = dir.appendingPathComponent("brain_colors.bin")
+        if FileManager.default.fileExists(atPath: colorsURL.path) { return }
+        let metaURL = dir.appendingPathComponent("brain_meta.json")
+        let metaData = try Data(contentsOf: metaURL)
+        let meta = try JSONDecoder().decode(ColormapMeta.self, from: metaData)
+        let bytes = meta.vertexCount * meta.bytesPerColor
+        // Mid-gray fully-opaque (0x80 0x80 0x80 0xFF) so the placeholder is
+        // visible if a host renders before the first colors arrive.
+        var buf = Data(count: bytes)
+        buf.withUnsafeMutableBytes { raw in
+            guard let p = raw.baseAddress else { return }
+            var i = 0
+            while i < bytes {
+                p.storeBytes(of: 0x80, toByteOffset: i, as: UInt8.self)
+                p.storeBytes(of: 0x80, toByteOffset: i + 1, as: UInt8.self)
+                p.storeBytes(of: 0x80, toByteOffset: i + 2, as: UInt8.self)
+                p.storeBytes(of: 0xFF, toByteOffset: i + 3, as: UInt8.self)
+                i += 4
+            }
+        }
+        try buf.write(to: colorsURL, options: .atomic)
     }
 
     // MARK: - Platform-specific entry points

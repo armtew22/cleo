@@ -7,7 +7,8 @@ import TribeBrainView
 
 /// A card showing the top-N activated brain regions from a `BrainReport`.
 ///
-/// Each row shows the region label, a z-score chip, and an L/R hemisphere badge.
+/// Each row shows the region name, a z-score chip, and an activation/deactivation
+/// badge derived from `direction`.
 public struct RegionReportCard: View {
     public let report: BrainReport
     public let topN: Int
@@ -31,7 +32,7 @@ public struct RegionReportCard: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(regions, id: \.parcelId) { region in
+                ForEach(Array(regions.enumerated()), id: \.offset) { _, region in
                     RegionRow(region: region)
                 }
             }
@@ -48,14 +49,14 @@ private struct RegionRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(region.label)
+            Text(region.name)
                 .font(.subheadline)
                 .lineLimit(1)
 
             Spacer(minLength: 4)
 
-            // Hemisphere badge
-            Text(hemisphereBadge)
+            // Direction badge: ↑ activation, ↓ deactivation.
+            Text(directionBadge)
                 .font(.caption2)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
@@ -71,14 +72,10 @@ private struct RegionRow: View {
         }
     }
 
-    private var hemisphereBadge: String {
-        switch region.hemisphere {
-        case .left:  return "L"
-        case .right: return "R"
-        }
+    private var directionBadge: String {
+        region.direction == "deactivation" ? "↓" : "↑"
     }
 
-    /// Positive z → warm, negative z → cool, near-zero → neutral.
     private var chipColor: Color {
         if region.zScore > 0 {
             return .orange

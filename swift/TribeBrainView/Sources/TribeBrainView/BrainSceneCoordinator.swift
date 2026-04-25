@@ -127,6 +127,22 @@ public final class BrainSceneCoordinator: NSObject {
         lastAppliedFrame = frame
     }
 
+    /// Convenience: write the buffer to a temporary `.bin` file then call the
+    /// existing path-based `swapColors`. Keeps the on-disk path canonical.
+    /// (We chose temp-file over an in-memory SCNGeometrySource constructor for
+    /// simplicity — Phase 6c gate is correctness, not zero-copy.)
+    public func updateColors(buffer: Data) throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tribebrainview-colors-\(UUID().uuidString).bin")
+        do {
+            try buffer.write(to: tmp, options: .atomic)
+        } catch {
+            throw BrainMeshError.malformed("temp colors write failed: \(error)")
+        }
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        try swapColors(from: tmp, vertexCount: vertexCount)
+    }
+
     // MARK: - Configuration
 
     /// Apply (or re-apply) a `BrainViewConfiguration`. Safe to call repeatedly.
