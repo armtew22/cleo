@@ -8,7 +8,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from tribe_backend.inference.preprocessing import _encode_video
+from tribe_backend.inference.preprocessing import _encode_audio, _encode_video
 
 
 pytestmark = pytest.mark.unit
@@ -76,3 +76,66 @@ def test_encode_video_lower_fps_handled() -> None:
     video = np.zeros((30, 8, 8, 3), dtype=np.uint8)
     out = _encode_video(video, fps=1.0)
     assert out.shape[0] == 60
+
+
+# ---- audio ------------------------------------------------------------------
+
+
+def test_encode_audio_resamples_to_16khz() -> None:
+    sr = 44100
+    n = sr * 30
+    audio = np.zeros(n, dtype=np.float32)
+    out = _encode_audio(audio, sr=sr)
+    # Target sample rate is 16000; tolerate tiny rounding from polyphase.
+    assert abs(out.shape[0] - 16000 * 30) <= 4
+
+
+def test_encode_audio_output_is_mono_float32() -> None:
+    audio = np.zeros(44100, dtype=np.float32)
+    out = _encode_audio(audio, sr=44100)
+    assert out.dtype == np.float32
+    assert out.ndim == 1
+
+
+def test_encode_audio_passthrough_when_already_16k_mono() -> None:
+    audio = np.linspace(-0.5, 0.5, 16000 * 5, dtype=np.float32)
+    out = _encode_audio(audio, sr=16000)
+    assert out.shape[0] == 16000 * 5
+    np.testing.assert_allclose(out, audio, atol=1e-6)
+
+
+def test_encode_audio_mixes_stereo_to_mono() -> None:
+    n = 16000 * 2
+    left = np.full(n, 0.25, dtype=np.float32)
+    right = np.full(n, 0.75, dtype=np.float32)
+    stereo = np.stack([left, right], axis=1)  # (S, 2)
+    out = _encode_audio(stereo, sr=16000)
+    assert out.ndim == 1
+    np.testing.assert_allclose(out, 0.5, atol=1e-6)
+
+
+def test_encode_audio_preserves_signal_energy_roughly() -> None:
+    sr = 44100
+    t = np.arange(sr * 2) / sr
+    sig = np.sin(2 * np.pi * 1000 * t).astype(np.float32)
+    out = _encode_audio(sig, sr=sr)
+    rms_in = float(np.sqrt(np.mean(sig**2)))
+    rms_out = float(np.sqrt(np.mean(out**2)))
+    assert abs(rms_in - rms_out) < 0.05
+
+
+def test_encode_audio_rejects_3d_array() -> None:
+    with pytest.raises((TypeError, ValueError)):
+        _encode_audio(np.zeros((10, 2, 2), dtype=np.float32), sr=16000)
+
+
+def test_encode_audio_rejects_non_positive_sr() -> None:
+    with pytest.raises(ValueError):
+        _encode_audio(np.zeros(100, dtype=np.float32), sr=0)
+
+
+def test_encode_audio_30s_at_44100_yields_30s_at_16000() -> None:
+    sr = 44100
+    audio = np.zeros(sr * 30, dtype=np.float32).astype(np.float32)
+    out = _encode_audio(audio, sr=sr)
+    assert abs(out.shape[0] - 16000 * 30) <= 4

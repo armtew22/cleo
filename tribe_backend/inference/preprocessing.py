@@ -93,7 +93,29 @@ def _encode_audio(audio: np.ndarray, sr: int) -> np.ndarray:
         Where ``S_resampled ~= S * 16000 / sr``. Polyphase resampling reduces
         ringing relative to FFT resampling on real waveforms.
     """
-    raise NotImplementedError  # implemented in the audio commit
+    if not isinstance(audio, np.ndarray):
+        raise TypeError(f"audio must be ndarray, got {type(audio).__name__}")
+    if audio.ndim not in (1, 2):
+        raise ValueError(f"audio must be 1D or 2D, got ndim={audio.ndim}")
+    if not isinstance(sr, (int, np.integer)) or int(sr) <= 0:
+        raise ValueError(f"sr must be a positive int, got {sr!r}")
+
+    # Cast to float32, collapse multichannel to mono.
+    x = audio.astype(np.float32, copy=False)
+    if x.ndim == 2:
+        x = x.mean(axis=1, dtype=np.float32)
+
+    sr = int(sr)
+    if sr == _TARGET_AUDIO_SR:
+        return np.ascontiguousarray(x, dtype=np.float32)
+
+    # Polyphase resample with up=target, down=src reduced by gcd.
+    from math import gcd
+    g = gcd(_TARGET_AUDIO_SR, sr)
+    up = _TARGET_AUDIO_SR // g
+    down = sr // g
+    y = resample_poly(x, up, down).astype(np.float32, copy=False)
+    return y
 
 
 def _encode_text(text: str) -> str:
