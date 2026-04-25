@@ -133,6 +133,10 @@ class MockPoller:
             self._closed = True
             self._cond.notify_all()
 
+    def pending(self) -> int:
+        with self._lock:
+            return len(self._queue)
+
     @property
     def closed(self) -> bool:
         return self._closed

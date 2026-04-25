@@ -69,13 +69,15 @@ class ControlUnit:
         mesh: MeshLike,
         sink: ArtifactSink,
         *,
-        backpressure_max_lag: int = 1,
+        backpressure_max_lag: int | None = None,
     ) -> None:
         """
-        backpressure_max_lag: how many windows we'll let pile up while the
-        previous one is still in inference before we start dropping the
-        oldest. The default of 1 means: never let more than the in-flight
-        window plus one queued window exist; anything older gets dropped.
+        backpressure_max_lag: maximum number of windows allowed to sit in
+        the poller buffer. When the count exceeds this, the oldest are
+        dropped (with a warning log) and only the most recent
+        `backpressure_max_lag` are kept. `None` (default) disables
+        backpressure entirely — every window is processed in order, which is
+        the correct semantics for an offline replay or a well-paced source.
         """
         self._poller = poller
         self._inference = inference
@@ -118,26 +120,32 @@ class ControlUnit:
     def run_stream(self, poller: LiveFeedPoller) -> Iterator[Bundle]:
         """Iterate over the poller, applying backpressure, yielding Bundles.
 
-        Backpressure: we read ahead from the poller as fast as it produces.
-        If multiple windows queue up while we're processing one, we drop all
-        but the freshest, incrementing `dropped_count` and logging.
+        Backpressure semantics: the loop pulls one window and processes it.
+        Once processing finishes, if the poller has more than
+        `backpressure_max_lag` windows already buffered (inferred from
+        `pending()`), we drop the older ones and only process the freshest.
+        Pollers without a `pending()` method receive no draining — every
+        window is processed in order.
+
+        This ensures that when the poller keeps up (pending stays low),
+        we never drop, and when inference falls behind, we drop oldest.
         """
         it = iter(poller)
-        pending: StimulusWindow | None = None
+        in_flight = False
         while True:
             if self._stop_event.is_set():
                 return
-            if pending is None:
-                try:
-                    pending = next(it)
-                except StopIteration:
-                    return
-            # Drain any windows that have piled up while we were waiting.
-            pending = self._drain_to_freshest(it, pending)
-            if pending is None:
+
+            if in_flight:
+                # We just processed a window. Before pulling the next one,
+                # drain anything that piled up while inference was running.
+                self._drain_pending(it)
+
+            try:
+                window = next(it)
+            except StopIteration:
                 return
-            window = pending
-            pending = None
+            in_flight = True
             yield self._process(window)
 
     def process_window(
@@ -167,6 +175,36 @@ class ControlUnit:
         return self._process(window).report
 
     # ----------------------------------------------------------------- private
+    def _drain_pending(self, it: Iterator[StimulusWindow]) -> None:
+        """If more than `backpressure_max_lag` windows are pending, drop all
+        but the most recent. Non-blocking — relies on `pending()` to know
+        how many windows are buffered.
+        """
+        if self._backpressure_max_lag is None:
+            return
+        pending_fn = getattr(it, "pending", None)
+        if not callable(pending_fn):
+            return
+        try:
+            n = int(pending_fn())
+        except Exception:  # pragma: no cover
+            return
+        if n <= self._backpressure_max_lag:
+            return
+        to_drop = n - self._backpressure_max_lag
+        dropped = 0
+        for _ in range(to_drop):
+            try:
+                next(it)
+            except StopIteration:
+                break
+            dropped += 1
+        if dropped:
+            self._dropped_count += dropped
+            logger.warning(
+                "backpressure: dropped %d stale window(s)", dropped
+            )
+
     def _drain_to_freshest(
         self, it: Iterator[StimulusWindow], head: StimulusWindow
     ) -> StimulusWindow | None:
