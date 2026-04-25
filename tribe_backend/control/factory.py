@@ -14,8 +14,46 @@ from tribe_backend.control.dispatcher import DiskArtifactSink
 from tribe_backend.control.poller import NoopPoller
 from tribe_backend.control.unit import ControlUnit
 from tribe_backend.inference import FakeTribeInference
+from tribe_backend.inference.protocol import InferenceFailure
 from tribe_backend.mesh import BrainMeshExporter
 from tribe_backend.parcellation import GlasserParcellationUnit
+
+__all__ = [
+    "default_control_unit",
+    "build_inference",
+    "InferenceFailure",
+]
+
+
+def build_inference(
+    name: str,
+    *,
+    fake_fixture: TribeOutput | None = None,
+) -> TribeInference:
+    """Pick a TribeInference implementation by name.
+
+    Exists so the API layer can select fake-vs-gpu without itself importing
+    `tribe_backend.inference` (preserves the api -> inference import-linter rule).
+
+    Parameters
+    ----------
+    name
+        "fake" or "gpu".
+    fake_fixture
+        Required when ``name == "fake"``; the deterministic TribeOutput the
+        FakeTribeInference returns for every window.
+    """
+    n = name.strip().lower()
+    if n == "fake":
+        if fake_fixture is None:
+            raise ValueError("build_inference('fake') requires fake_fixture")
+        return FakeTribeInference(fake_fixture)
+    if n == "gpu":
+        # Lazy import — keeps torch out of `import tribe_backend.control.factory`
+        # for non-GPU consumers (tests, the fake API path).
+        from tribe_backend.inference import GpuTribeInference  # type: ignore[attr-defined]
+        return GpuTribeInference()
+    raise ValueError(f"unknown inference name {name!r}; expected 'fake' or 'gpu'")
 
 
 def default_control_unit(
