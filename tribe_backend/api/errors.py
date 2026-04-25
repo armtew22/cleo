@@ -90,11 +90,21 @@ def _default_code_for(status_code: int) -> str:
         400: "bad_request",
         404: "not_found",
         409: "conflict",
+        410: "gone",
         413: "payload_too_large",
         415: "unsupported_media_type",
         422: "validation_error",
+        500: "internal_error",
         503: "service_unavailable",
     }.get(status_code, "error")
+
+
+# ---------------------------------------------------------------- Phase C codes
+# Centralized so route handlers and tests can refer to symbolic names instead
+# of stringly-typed magic. The actual envelope shape is unchanged.
+CODE_JOB_NOT_READY = "JOB_NOT_READY"
+CODE_JOB_FAILED = "JOB_FAILED"
+CODE_INFERENCE_ARTIFACTS_MISSING = "INFERENCE_ARTIFACTS_MISSING"
 
 
 def install_handlers(app: FastAPI) -> None:

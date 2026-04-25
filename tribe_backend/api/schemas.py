@@ -58,6 +58,7 @@ class JobStatusResponse(BaseModel):
 
     `report` is populated only when status == "done".
     `error` is populated only when status == "failed".
+    `mesh` is the URL of the mesh manifest, populated only when status == "done".
     """
     model_config = ConfigDict(extra="ignore")
 
@@ -68,3 +69,28 @@ class JobStatusResponse(BaseModel):
     finished_at: Optional[datetime] = None
     report: Optional[ReportResponse] = None
     error: Optional[ErrorInfo] = None
+    mesh: Optional[str] = None
+
+
+# ---------------------------------------------------------- Phase C schemas
+
+class MeshArtifacts(BaseModel):
+    """The four artifact URLs enumerated by the per-job mesh manifest."""
+    model_config = ConfigDict(extra="forbid")
+
+    meta: str
+    colors: str
+    vertices: str
+    faces: str
+
+
+class MeshManifest(BaseModel):
+    """Body for GET /v1/runs/{job_id}/mesh.
+
+    Lets the frontend discover artifact URLs from a job_id without
+    hand-constructing them.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    artifacts: MeshArtifacts

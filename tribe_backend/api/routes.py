@@ -18,10 +18,17 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
 from fastapi.responses import JSONResponse, Response
 
+from tribe_backend.api import artifacts as _artifacts
 from tribe_backend.api.decoding import DecodeError, decode_mp4, probe_video_fps
 from tribe_backend.api.deps import get_control_unit, get_settings
-from tribe_backend.api.errors import APIError
+from tribe_backend.api.errors import (
+    CODE_INFERENCE_ARTIFACTS_MISSING,
+    CODE_JOB_FAILED,
+    CODE_JOB_NOT_READY,
+    APIError,
+)
 from tribe_backend.api.jobs import (
+    Job,
     JobStore,
     NotCancellable,
     QueueFull,
@@ -30,6 +37,8 @@ from tribe_backend.api.jobs import (
 from tribe_backend.api.schemas import (
     HealthResponse,
     JobStatusResponse,
+    MeshArtifacts,
+    MeshManifest,
     ReportResponse,
     SubmitResponse,
 )
@@ -141,12 +150,23 @@ def submit_run(
     )
 
 
-@router.get("/runs/{job_id}")
-def get_run(request: Request, job_id: str):
+def _fetch_job(request: Request, job_id: str) -> Job:
+    """Look up a job, raising 404 JOB_NOT_FOUND if unknown.
+
+    The id is also pre-validated for shape so a path-traversal attempt
+    never reaches the JobStore (and thus never gets close to the filesystem
+    via any future code path that consumes the same id).
+    """
+    if not _artifacts.is_safe_job_id(job_id):
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="JOB_NOT_FOUND",
+            message=f"unknown job_id {job_id!r}",
+        )
     jobs = _get_jobs(request)
     import anyio
     try:
-        job = anyio.from_thread.run(jobs.get, job_id)
+        return anyio.from_thread.run(jobs.get, job_id)
     except UnknownJob:
         raise APIError(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -154,11 +174,52 @@ def get_run(request: Request, job_id: str):
             message=f"unknown job_id {job_id!r}",
         )
 
+
+def _require_done_job(job: Job) -> str:
+    """Map a job's status to either its on-disk window_id (success) or an APIError.
+
+    Returns the disk directory key (== window_id from the report).
+    """
+    if job.status in ("queued", "running"):
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            code=CODE_JOB_NOT_READY,
+            message=f"job {job.job_id} is {job.status}; mesh artifacts are not ready",
+        )
+    if job.status == "failed":
+        raise APIError(
+            status_code=status.HTTP_410_GONE,
+            code=CODE_JOB_FAILED,
+            message=f"job {job.job_id} failed; mesh artifacts will never exist",
+        )
+    if job.status == "cancelled":
+        raise APIError(
+            status_code=status.HTTP_410_GONE,
+            code=CODE_JOB_FAILED,
+            message=f"job {job.job_id} was cancelled; mesh artifacts will never exist",
+        )
+    # status == "done" — pull the on-disk dir key from the report.
+    if not job.report or not job.report.get("window_id"):
+        raise APIError(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            code=CODE_INFERENCE_ARTIFACTS_MISSING,
+            message=f"job {job.job_id} is done but report has no window_id",
+        )
+    return str(job.report["window_id"])
+
+
+@router.get("/runs/{job_id}")
+def get_run(request: Request, job_id: str):
+    job = _fetch_job(request, job_id)
+
     report_model = None
+    mesh_url = None
     if job.report is not None:
         # job.report is the Report.to_json() dict shape; coerce through the
         # response schema so we drop unknown keys / coerce types consistently.
         report_model = ReportResponse.model_validate(job.report)
+    if job.status == "done":
+        mesh_url = f"/v1/runs/{job.job_id}/mesh"
 
     body = JobStatusResponse(
         job_id=job.job_id,
@@ -168,8 +229,38 @@ def get_run(request: Request, job_id: str):
         finished_at=job.finished_at,
         report=report_model,
         error=job.error,  # type: ignore[arg-type]  (pydantic coerces dict→ErrorInfo)
+        mesh=mesh_url,
     ).model_dump(mode="json")
-    return JSONResponse(status_code=status.HTTP_200_OK, content=body)
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=body,
+        headers={"Cache-Control": _artifacts.JSON_CACHE_HEADER},
+    )
+
+
+# ----------------------------------------------------------------- Phase C
+# Mesh artifact endpoints: per-job manifest + four GETs serving the binary
+# / JSON files written by ControlUnit's mesh exporter.
+
+@router.get("/runs/{job_id}/mesh", response_model=MeshManifest)
+def get_mesh_manifest(request: Request, job_id: str):
+    """Per-job artifact manifest. Requires status == done."""
+    job = _fetch_job(request, job_id)
+    _require_done_job(job)  # reject queued/running/failed/cancelled
+    body = MeshManifest(
+        job_id=job.job_id,
+        artifacts=MeshArtifacts(
+            meta=f"/v1/runs/{job.job_id}/mesh/meta",
+            colors=f"/v1/runs/{job.job_id}/mesh/colors",
+            vertices=f"/v1/runs/{job.job_id}/mesh/vertices",
+            faces=f"/v1/runs/{job.job_id}/mesh/faces",
+        ),
+    ).model_dump()
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=body,
+        headers={"Cache-Control": _artifacts.JSON_CACHE_HEADER},
+    )
 
 
 @router.delete("/runs/{job_id}")
