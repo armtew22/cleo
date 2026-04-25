@@ -24,6 +24,8 @@ class Settings:
     inference: Literal["fake", "gpu"] = field(default="fake")
     out_dir: str = field(default="./out")
     cors_allow_origins: list[str] = field(default_factory=lambda: ["*"])
+    queue_depth: int = field(default=4)
+    drain_timeout_s: float = field(default=5.0)
 
     def __init__(self) -> None:  # type: ignore[override]
         # Read env at construction so tests can monkeypatch reliably.
@@ -37,7 +39,19 @@ class Settings:
         cors = [o.strip() for o in cors_raw.split(",") if o.strip()]
         if not cors:
             cors = ["*"]
+        try:
+            queue_depth = int(os.environ.get("TRIBE_QUEUE_DEPTH", "4"))
+        except ValueError:
+            raise ValueError("TRIBE_QUEUE_DEPTH must be an integer")
+        if queue_depth < 1:
+            raise ValueError("TRIBE_QUEUE_DEPTH must be >= 1")
+        try:
+            drain_timeout = float(os.environ.get("TRIBE_DRAIN_TIMEOUT_S", "5.0"))
+        except ValueError:
+            raise ValueError("TRIBE_DRAIN_TIMEOUT_S must be a float")
         # frozen=True dataclass: bypass setattr restriction via object.__setattr__
         object.__setattr__(self, "inference", inference)
         object.__setattr__(self, "out_dir", out_dir)
         object.__setattr__(self, "cors_allow_origins", cors)
+        object.__setattr__(self, "queue_depth", queue_depth)
+        object.__setattr__(self, "drain_timeout_s", drain_timeout)
