@@ -63,6 +63,7 @@ Live OpenAPI docs:
 | `media` | file (mp4) | yes | The 30-second video. Audio is extracted from the file's audio track via ffmpeg server-side. Other container formats are not supported in v1. |
 | `text`  | string | yes | A one-sentence description of what the clip shows. Fed to the model's text encoder. |
 | `wait`  | bool   | no (default `false`) | If `true`, the request blocks until the report is ready and returns 200 + the Report inline. **Disabled when `TRIBE_INFERENCE=gpu`** — a 5-minute synchronous request would time out most clients. Use the async path. |
+| `z_threshold` | float (≥ 0) | no (default 1.5) | Z-score cut-off for the ranked `top_regions[]` in the report. The default of 1.5 is calibrated for strong sustained activations; real stimuli often produce weaker per-parcel means and return an empty list. Lower this (e.g. `0.1`) to see the long tail. Higher values (e.g. `3.0`) only surface the most prominent regions. |
 
 ### Response — `202 Accepted`
 
@@ -79,6 +80,7 @@ Live OpenAPI docs:
 curl -sS -X POST \
   -F "media=@traffic_30s.mp4" \
   -F "text=A busy traffic intersection at dusk with car horns and pedestrians." \
+  -F "z_threshold=0.1" \
   http://ellis-compute-02.cs.cornell.edu:8000/v1/runs
 ```
 
