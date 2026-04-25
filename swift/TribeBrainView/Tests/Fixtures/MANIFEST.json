@@ -1,0 +1,192 @@
+[
+  {
+    "relpath": "animation/animation_meta.json",
+    "sha256": "c323aa7f9424a7b55ad17564d2f71298bd7d84d1b3a330516a7cdc8ccc74e005",
+    "bytes": 1085
+  },
+  {
+    "relpath": "animation/brain_colors_t0000.bin",
+    "sha256": "7b9be08f0f120d67ad3599831706bd6092ccd8fd0cf60175ba373bcde1114505",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0001.bin",
+    "sha256": "5dc91ff6c14316d4b3f6098014496a228f5f3c0aef7f6bf11580a0cbb135d99d",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0002.bin",
+    "sha256": "32b9a94ef190a0fb3d01b7f18860a54b4f908223e6e1a6670aabdedd7fc9d854",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0003.bin",
+    "sha256": "074bfd20541971069e66d5c9768e8cb8e7fe9e58a7f1f4225448812292a04247",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0004.bin",
+    "sha256": "c7c2759376ae26052f52f559d72c30fb5392e72d88d4472090b206efd8a4f971",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0005.bin",
+    "sha256": "cc52616638938c04c8e554ca94cec9db83a7fa0d1cb0cf2796bb2026c4e99643",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0006.bin",
+    "sha256": "ac7472bca8913836f77f5c19899f2844240f342314b83beb5c693cf5f44d5b7a",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0007.bin",
+    "sha256": "1e9d352d9d90017d292beb03b2af9d024dd4dde62dc7b31a41fcd338f09d0e29",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0008.bin",
+    "sha256": "fbe3d94f8f3c0c825d90375a8ccc764932f06065d2130249eb1d81cf5bf5c8bc",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0009.bin",
+    "sha256": "e2b0825f7ab7b1348ac30d2157d852b8e765fd3dba19ab9f9f841ff2549ecfbf",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0010.bin",
+    "sha256": "e6850b6616849076976dead977e6412de39958a0c01873bbaaf1f478b27897f8",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0011.bin",
+    "sha256": "126100fbca7757ca270634926146f1e84dd6c19091016e487f48d61ae01218fa",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0012.bin",
+    "sha256": "685afe90049507ef38e88c7b1028f9dafee4c4d80c2407e5708c91e7b69e40f2",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0013.bin",
+    "sha256": "cec408cd4fa00864089f712a9dda37edcc91c6fabcf3e311d535e2bc8834d954",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0014.bin",
+    "sha256": "940cd6ef952929821d59018521719455ce68ccea6b45404eaa7f2098a2fb33fa",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0015.bin",
+    "sha256": "6bcafc057763a89be71fdcba6bc80ff10d77a1ead722f9d3fdbb60e2835bbc3a",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0016.bin",
+    "sha256": "f4e6f7dde114f6643e748cfb20a686135c8378043c54a707c2929ccef037182f",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0017.bin",
+    "sha256": "bbe268e10e95dcedd2e15d3a51647a36dd139c06b2e1896661842952d08217af",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0018.bin",
+    "sha256": "ad6e6a0bef267f7d0e5586a13061747fe51930378f2e9325d768d79543dbe399",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0019.bin",
+    "sha256": "568ef97234ecee18381f2ac99dabf07f7b36b22e996f04c63801e58f257a8be2",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0020.bin",
+    "sha256": "69e56e9e8fef499e81472f9b1bb600397a1dbbbcf3af4e6843a553757431dc5b",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0021.bin",
+    "sha256": "d103422bc14bd17ab29eeff45912501e7b78bd61d1aa8a87aad7ff7b14310c7f",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0022.bin",
+    "sha256": "457113bc2139999e117d885816bd7b4f0aa987e604ce8e5dd5f751543a03ed75",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0023.bin",
+    "sha256": "273e295980158ffcea3d22af25294e3081bd84227e6cbb00b461347a1ae43269",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0024.bin",
+    "sha256": "7f2adafa91e77cc8cac159b0259eb2ab329d361d28a69d538be9ee241424a35a",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0025.bin",
+    "sha256": "a071d59cdc36af85d9fcca50b9335e55928d5d3304d4e2c35039f719d6c5f3f7",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0026.bin",
+    "sha256": "d6ad772e2ea5249317e68d0ae2562d74b3c949e5303bd586d289010c79ae7ab2",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0027.bin",
+    "sha256": "d177e60738583e8e9621663832acedfdfedc7846a92397f882b3ddb2ae1f94fb",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0028.bin",
+    "sha256": "a6407b5584028d92143b9e44f5ee72c0486e889ef470d1bd7383b88e9c54fbe6",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0029.bin",
+    "sha256": "39c027b866e294501ad398c3895100a3a621be92b49f2129acb0e96fe373a6d7",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_colors_t0030.bin",
+    "sha256": "85be8d0f2b8c1fdca722038230563536fc81536823d8c52f03bebecd515e15a3",
+    "bytes": 81936
+  },
+  {
+    "relpath": "animation/brain_faces.bin",
+    "sha256": "6adc6920cb1c14d73beb0e6d7213da4e5d89de45dd13a8ab795b9b1e0f7b0169",
+    "bytes": 491520
+  },
+  {
+    "relpath": "animation/brain_vertices.bin",
+    "sha256": "94056badcdf9e1ea614f932aa8ab83384292ea0c848fa4227fc312e1f888f474",
+    "bytes": 245808
+  },
+  {
+    "relpath": "static/brain_colors.bin",
+    "sha256": "d25c7aa4cca04eab48836b7215b23fc6def040a73a2388c5d7b04b6a6d637320",
+    "bytes": 81936
+  },
+  {
+    "relpath": "static/brain_faces.bin",
+    "sha256": "6adc6920cb1c14d73beb0e6d7213da4e5d89de45dd13a8ab795b9b1e0f7b0169",
+    "bytes": 491520
+  },
+  {
+    "relpath": "static/brain_meta.json",
+    "sha256": "007c1ad417bc134d5a1c1aba12cfde9a74eab4581b97eb3f1490e50d13c36c37",
+    "bytes": 366
+  },
+  {
+    "relpath": "static/brain_vertices.bin",
+    "sha256": "94056badcdf9e1ea614f932aa8ab83384292ea0c848fa4227fc312e1f888f474",
+    "bytes": 245808
+  }
+]
