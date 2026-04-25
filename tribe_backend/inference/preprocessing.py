@@ -125,4 +125,6 @@ def _encode_text(text: str) -> str:
     takes a stimulus caption and returns a tokenized representation) without
     pulling in a 3 GB tokenizer dependency for Phase 4 unit tests.
     """
-    raise NotImplementedError  # implemented in the text commit
+    if not isinstance(text, str):
+        raise TypeError(f"text must be str, got {type(text).__name__}")
+    return text

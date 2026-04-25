@@ -8,7 +8,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from tribe_backend.inference.preprocessing import _encode_audio, _encode_video
+from tribe_backend.inference.preprocessing import (
+    _encode_audio,
+    _encode_text,
+    _encode_video,
+)
 
 
 pytestmark = pytest.mark.unit
@@ -139,3 +143,26 @@ def test_encode_audio_30s_at_44100_yields_30s_at_16000() -> None:
     audio = np.zeros(sr * 30, dtype=np.float32).astype(np.float32)
     out = _encode_audio(audio, sr=sr)
     assert abs(out.shape[0] - 16000 * 30) <= 4
+
+
+# ---- text -------------------------------------------------------------------
+
+
+def test_encode_text_returns_string_placeholder() -> None:
+    out = _encode_text("a busy intersection")
+    # Phase 4 placeholder: real Llama-3.2-3B tokenizer arrives in Phase 5.
+    assert out == "a busy intersection"
+
+
+def test_encode_text_handles_empty_string() -> None:
+    assert _encode_text("") == ""
+
+
+def test_encode_text_is_callable() -> None:
+    assert callable(_encode_text)
+
+
+@pytest.mark.skip(reason="Phase 5 — needs Llama-3.2-3B tokenizer for shape check")
+def test_encode_text_produces_2hz_token_tensor_shape() -> None:
+    # Will assert (T_2hz, D_text=2048) once the real tokenizer lands.
+    raise NotImplementedError
