@@ -27,3 +27,17 @@ def test_inference_failure_carries_message() -> None:
 def test_inference_failure_can_be_raised_and_caught() -> None:
     with pytest.raises(InferenceFailure):
         raise InferenceFailure("boom")
+
+
+def test_package_lazy_reexports_fake_tribe_inference() -> None:
+    import tribe_backend.inference as inf
+    from tribe_backend.inference.stub import FakeTribeInference as Direct
+
+    assert inf.FakeTribeInference is Direct
+
+
+def test_package_unknown_attribute_raises_attribute_error() -> None:
+    import tribe_backend.inference as inf
+
+    with pytest.raises(AttributeError):
+        _ = inf.DoesNotExist

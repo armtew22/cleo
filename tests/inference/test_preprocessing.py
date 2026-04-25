@@ -82,6 +82,23 @@ def test_encode_video_lower_fps_handled() -> None:
     assert out.shape[0] == 60
 
 
+def test_encode_video_rejects_non_ndarray() -> None:
+    with pytest.raises(TypeError):
+        _encode_video([[[[0, 0, 0]]]], fps=2.0)  # type: ignore[arg-type]
+
+
+def test_encode_video_rejects_non_positive_fps() -> None:
+    with pytest.raises(ValueError):
+        _encode_video(np.zeros((10, 8, 8, 3), dtype=np.uint8), fps=0)
+
+
+def test_encode_video_single_target_frame_branch() -> None:
+    # Very short clip whose 2 Hz target rounds to 1.
+    video = np.zeros((1, 8, 8, 3), dtype=np.uint8)
+    out = _encode_video(video, fps=4.0)
+    assert out.shape[0] == 1
+
+
 # ---- audio ------------------------------------------------------------------
 
 
@@ -138,6 +155,11 @@ def test_encode_audio_rejects_non_positive_sr() -> None:
         _encode_audio(np.zeros(100, dtype=np.float32), sr=0)
 
 
+def test_encode_audio_rejects_non_ndarray() -> None:
+    with pytest.raises(TypeError):
+        _encode_audio([0.0, 0.1, 0.2], sr=16000)  # type: ignore[arg-type]
+
+
 def test_encode_audio_30s_at_44100_yields_30s_at_16000() -> None:
     sr = 44100
     audio = np.zeros(sr * 30, dtype=np.float32).astype(np.float32)
@@ -160,6 +182,11 @@ def test_encode_text_handles_empty_string() -> None:
 
 def test_encode_text_is_callable() -> None:
     assert callable(_encode_text)
+
+
+def test_encode_text_rejects_non_string() -> None:
+    with pytest.raises(TypeError):
+        _encode_text(123)  # type: ignore[arg-type]
 
 
 @pytest.mark.skip(reason="Phase 5 — needs Llama-3.2-3B tokenizer for shape check")
