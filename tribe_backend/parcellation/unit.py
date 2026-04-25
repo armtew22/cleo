@@ -8,6 +8,10 @@ Built bottom-up:
 """
 from __future__ import annotations
 
+import json
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+
 import numpy as np
 
 from tribe_backend.contracts import (
@@ -21,16 +25,101 @@ import warnings
 from .atlas import load_glasser_cortical, load_harvard_oxford_subcortical
 
 
+_DESCRIPTIONS_PATH = Path(__file__).with_name("descriptions.json")
+
+
+def _load_descriptions() -> dict[str, str]:
+    if _DESCRIPTIONS_PATH.is_file():
+        with _DESCRIPTIONS_PATH.open("r", encoding="utf-8") as fh:
+            return json.load(fh)
+    return {}
+
+
 class WindowSizeWarning(UserWarning):
     """Emitted when an aggregation method receives T != EXPECTED_T_PER_30S_WINDOW."""
 
 
+@dataclass(frozen=True)
 class RegionActivation:
-    """Placeholder — populated in the report layer."""
+    """A single ranked region with its aggregated z-score and direction."""
+
+    name: str
+    z_score: float
+    direction: str  # "activation" or "deactivation"
+    description: str = ""
+
+    def to_dict(self) -> dict:
+        return asdict(self)
 
 
+@dataclass(frozen=True)
 class Report:
-    """Placeholder — populated in the report layer."""
+    """Output of GlasserParcellationUnit.generate_report.
+
+    top_regions  — ranked list (descending |z|) above z_threshold.
+    text         — qualitative narrative composed from the top regions.
+    method       — aggregation method used ("window_mean" by default).
+    z_threshold  — the threshold applied to filter regions.
+    window_id    — traces back to the StimulusWindow / TribeOutput.
+    """
+
+    top_regions: list[RegionActivation]
+    text: str
+    method: str
+    z_threshold: float
+    window_id: str | None = None
+
+    def to_json(self) -> str:
+        payload = {
+            "top_regions": [r.to_dict() for r in self.top_regions],
+            "text": self.text,
+            "method": self.method,
+            "z_threshold": self.z_threshold,
+            "window_id": self.window_id,
+        }
+        return json.dumps(payload)
+
+    @classmethod
+    def from_json(cls, blob: str) -> "Report":
+        d = json.loads(blob)
+        regions = [RegionActivation(**r) for r in d.get("top_regions", [])]
+        return cls(
+            top_regions=regions,
+            text=d.get("text", ""),
+            method=d.get("method", "window_mean"),
+            z_threshold=float(d.get("z_threshold", 1.5)),
+            window_id=d.get("window_id"),
+        )
+
+
+def _strength_template(z: float) -> str:
+    """Map an absolute z-score to a qualitative strength label."""
+    a = abs(z)
+    if a >= 4.0:
+        return "strong"
+    if a >= 2.5:
+        return "pronounced"
+    if a >= 1.5:
+        return "moderate"
+    return "weak"
+
+
+def _compose_narrative(
+    regions: list[RegionActivation],
+    descriptions: dict[str, str],
+) -> str:
+    if not regions:
+        return "No significant activations detected in this window."
+    parts: list[str] = []
+    for r in regions:
+        strength = _strength_template(r.z_score)
+        verb = "activation" if r.direction == "activation" else "deactivation"
+        desc = descriptions.get(r.name) or r.description or ""
+        suffix = f" ({desc})" if desc else ""
+        parts.append(
+            f"{strength} {verb} in {r.name}{suffix} (z={r.z_score:+.2f})"
+        )
+    return "Window summary: " + "; ".join(parts) + "."
 
 
 class GlasserParcellationUnit:
@@ -78,6 +167,7 @@ class GlasserParcellationUnit:
         self._sub_masks: dict[str, np.ndarray] = self._build_masks(
             self._sub_labels, self._sub_names
         )
+        self._descriptions = _load_descriptions()
 
     # -- properties ----------------------------------------------------------
     @property
@@ -207,3 +297,43 @@ class GlasserParcellationUnit:
         ]
         survivors.sort(key=lambda nv: abs(nv[1]), reverse=True)
         return survivors[:top_k]
+
+    # -- layer 4: generate_report -------------------------------------------
+    def generate_report(
+        self,
+        output: TribeOutput,
+        *,
+        method: str = "window_mean",
+        top_k: int = 10,
+        z_threshold: float = 1.5,
+    ) -> Report:
+        """Convert a TribeOutput into a ranked, narrated Report.
+
+        Defaults to window_mean — averages across all 31 timesteps before
+        ranking — so the narrative reflects sustained activations, not
+        transients. Pass method="peak" or "peak_window" to surface transients.
+        """
+        cort_series = self.parcellate_cortical(output.cortical)
+        sub_series = self.parcellate_subcortical(output.subcortical)
+        all_series = {**cort_series, **sub_series}
+
+        agg = self.aggregate(all_series, method=method)
+        ranked = self.rank_and_threshold(agg, top_k=top_k, z_threshold=z_threshold)
+
+        regions = [
+            RegionActivation(
+                name=name,
+                z_score=float(z),
+                direction="activation" if z >= 0 else "deactivation",
+                description=self._descriptions.get(name, ""),
+            )
+            for name, z in ranked
+        ]
+        text = _compose_narrative(regions, self._descriptions)
+        return Report(
+            top_regions=regions,
+            text=text,
+            method=method,
+            z_threshold=float(z_threshold),
+            window_id=output.window_id,
+        )
