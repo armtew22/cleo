@@ -3,8 +3,9 @@
 import Foundation
 import TribeBrainView
 
-// MARK: - Report (UI-layer Codable mirror of GlasserParcellationUnit.Report)
-// Re-exports BrainReport from the core target for UI consumers.
-// Additional UI-specific formatting helpers go here in Phase 7.
-
+// See TribeBrainView.BrainReport — that struct is the canonical Codable mirror of
+// GlasserParcellationUnit.Report. A parallel struct here would be redundant; the
+// typealias below exposes it under the shorter name for UI-layer call sites.
+// Decision (Phase 7): collapsed to a single struct in the core target. Phase 8 docs
+// should update §3 file-tree note for Report.swift to reflect this.
 public typealias Report = BrainReport
