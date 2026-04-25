@@ -1,0 +1,11 @@
+{
+  "Amygdala": "limbic salience and threat detection",
+  "FFC": "fusiform face complex (face / object recognition)",
+  "V1": "primary visual cortex (low-level visual features)",
+  "STSva": "anterior superior temporal sulcus (social / theory-of-mind)",
+  "PGi": "inferior parietal cortex (multimodal integration)",
+  "Left-Thalamus": "left thalamus (relay, attention)",
+  "Right-Thalamus": "right thalamus (relay, attention)",
+  "Left-Hippocampus": "left hippocampus (declarative memory)",
+  "Right-Hippocampus": "right hippocampus (declarative memory)"
+}
