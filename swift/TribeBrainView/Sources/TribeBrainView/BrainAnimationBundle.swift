@@ -86,6 +86,7 @@ public struct BrainAnimationBundle {
 
 // MARK: - BrainAnimMeta (Codable mirror of animation_meta.json)
 
+/// Codable mirror of `animation_meta.json` produced by `BrainMeshExporter.export_animation_bundle()`.
 public struct BrainAnimMeta: Codable {
     public let format: String?
     public let kind: String?

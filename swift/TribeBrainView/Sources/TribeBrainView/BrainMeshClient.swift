@@ -4,6 +4,7 @@ import Foundation
 
 // MARK: - ColorsResponse
 
+/// Decoded response from `POST /v1/inference/colors`.
 public struct ColorsResponse {
     public let windowId: String
     public let frameCount: Int
@@ -32,6 +33,7 @@ public struct ColorsResponse {
 
 // MARK: - InferenceEnvelope
 
+/// Decoded response from `POST /v1/inference/full`: colors buffer + qualitative report.
 public struct InferenceEnvelope {
     public let windowId: String
     /// Echoed from the JSON envelope (vmin/vmax/method) and populated with the
@@ -64,6 +66,7 @@ public struct InferenceEnvelope {
 
 // MARK: - BrainMeshClientError
 
+/// Errors thrown by ``BrainMeshClient`` during network or decoding operations.
 public enum BrainMeshClientError: Error, Equatable {
     case server(status: Int, body: String?)
     case invalidResponse(String)

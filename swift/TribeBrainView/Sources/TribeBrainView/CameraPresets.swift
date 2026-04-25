@@ -6,6 +6,7 @@ import CoreGraphics
 
 // MARK: - CameraPreset
 
+/// Named camera orientations for the cortical brain view.
 public enum CameraPreset: String, CaseIterable {
     case lateralLeft         = "lateral_left"
     case lateralRight        = "lateral_right"
@@ -44,15 +45,14 @@ public struct CameraPresetDescriptor {
 
 // MARK: - Constants
 
-/// Bounding-sphere radius used to position the camera (mm).
-/// fsaverage5 pial mesh extends ~80 mm from origin in any direction; 320 mm
-/// places the camera comfortably outside with room for a 30deg FOV.
+/// Bounding-sphere radius used to position the camera (mm, fsaverage5 pial).
 public let brainCameraRadius: Float = 320.0
 
 private let defaultFOV: CGFloat = 30.0
 
 // MARK: - Preset table
 
+/// Returns the ``CameraPresetDescriptor`` for the given preset.
 public func cameraDescriptor(for preset: CameraPreset) -> CameraPresetDescriptor {
     let s = Float(1.0 / 3.0.squareRoot())   // 1/sqrt(3)
 

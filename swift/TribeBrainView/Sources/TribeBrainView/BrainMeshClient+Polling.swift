@@ -10,6 +10,7 @@ import Foundation
 // freshest data the server has been asked about.
 
 extension BrainMeshClient {
+    /// Returns an `AsyncThrowingStream` that posts each image from `images` and yields ``ColorsResponse`` values.
     public nonisolated func poll(
         images: AsyncStream<Data>,
         every interval: Duration,
@@ -55,6 +56,7 @@ extension BrainMeshClient {
         }
     }
 
+    /// Returns an `AsyncThrowingStream` that posts each image from `images` and yields ``InferenceEnvelope`` values.
     public nonisolated func pollFull(
         images: AsyncStream<Data>,
         every interval: Duration,

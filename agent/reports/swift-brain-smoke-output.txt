@@ -1,0 +1,40 @@
+
+--- 1. GET /v1/mesh/static ---
+[PASS] status 200 — got 200
+[PASS] ETag header present
+[PASS] Cache-Control: immutable
+[PASS] tar contains brain_vertices.bin — ['brain_vertices.bin', 'brain_normals.bin', 'brain_faces.bin', 'brain_meta.json']
+[PASS] tar contains brain_normals.bin — ['brain_vertices.bin', 'brain_normals.bin', 'brain_faces.bin', 'brain_meta.json']
+[PASS] tar contains brain_faces.bin — ['brain_vertices.bin', 'brain_normals.bin', 'brain_faces.bin', 'brain_meta.json']
+[PASS] tar contains brain_meta.json — ['brain_vertices.bin', 'brain_normals.bin', 'brain_faces.bin', 'brain_meta.json']
+
+--- 2. POST /v1/inference/colors ---
+[PASS] status 200 — got 200
+[PASS] body exactly 81936 bytes — got 81936
+[PASS] X-Window-Id present
+[PASS] X-Tribe-Method present
+[PASS] X-Vmin present
+[PASS] X-Vmax present
+[PASS] X-Frame-Count present
+[PASS] X-Frame-Count == 1 — got 1
+
+--- 3. POST /v1/inference/full ---
+[PASS] status 200 — got 200
+[PASS] envelope has window_id
+[PASS] envelope has colors_url
+[PASS] envelope has report
+[PASS] envelope has vmin
+[PASS] envelope has vmax
+[PASS] envelope has method
+[PASS] report has top_regions — ['top_regions', 'text', 'method', 'z_threshold', 'window_id']
+[PASS] colors_url GET 200 — got 200
+[PASS] colors_url body 81936 bytes — got 81936
+
+--- 4. GET /v1/mesh/static with If-None-Match ---
+[PASS] 304 on matching ETag — got 304
+
+=== Smoke summary ===
+Total checks : 26
+Passed       : 26
+Failed       : 0
+Result       : ALL PASS

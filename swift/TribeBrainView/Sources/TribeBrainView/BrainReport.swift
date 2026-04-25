@@ -3,20 +3,8 @@
 import Foundation
 
 // MARK: - BrainReport
-//
-// Codable mirror of `tribe_backend.parcellation.unit.Report.to_json()`:
-//
-//   {
-//     "top_regions": [
-//        { "name": "...", "z_score": 2.4, "direction": "activation",
-//          "description": "..." }, ...
-//     ],
-//     "text": "Window summary: ...",
-//     "method": "window_mean",
-//     "z_threshold": 1.5,
-//     "window_id": "abc123" | null
-//   }
 
+/// Codable mirror of `tribe_backend.parcellation.unit.Report.to_json()`.
 public struct BrainReport: Codable, Equatable {
     public let topRegions: [RegionActivation]
     public let text: String
@@ -49,6 +37,7 @@ public struct BrainReport: Codable, Equatable {
 
 // MARK: - RegionActivation
 
+/// A single Glasser parcellation region with its z-score and activation direction.
 public struct RegionActivation: Codable, Equatable {
     public let name: String
     public let zScore: Double

@@ -5,6 +5,7 @@ import SceneKit
 
 // MARK: - BrainMeshError
 
+/// Errors thrown by ``BrainMeshLoader`` during file loading or validation.
 public enum BrainMeshError: Error {
     case malformed(String)
     case missingFile(URL)
@@ -15,6 +16,8 @@ public enum BrainMeshError: Error {
 
 // MARK: - BrainMeshLoader
 
+/// Loads and updates brain mesh geometry from binary buffer files produced by
+/// `BrainMeshExporter.export_binary()` in `tribe_backend/mesh/exporter.py`.
 public enum BrainMeshLoader {
     // Layout constants — must match `tribe_backend/mesh/exporter.py::export_binary`.
     fileprivate static let bytesPerVertex = 12      // 3 × Float32
