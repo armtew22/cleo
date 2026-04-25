@@ -114,6 +114,23 @@ def submit_run(
     wait: Annotated[bool, Form(description="if true, return Report inline (Phase A sync mode)")] = False,
     cu: ControlUnit = Depends(get_control_unit),
 ):
+    # Phase E: refuse `wait=true` in production GPU mode. A real GPU window
+    # takes ~5 minutes; a synchronous request would block uvicorn's event
+    # loop slot and the user's UI for that whole time. Fake-mode dev wait
+    # remains permitted (sub-second) for ergonomic testing.
+    if wait:
+        settings = get_settings(request)
+        if settings.inference == "gpu":
+            raise APIError(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                code="WAIT_DISABLED_GPU",
+                message=(
+                    "wait=true is disabled when TRIBE_INFERENCE=gpu (5-minute "
+                    "blocking request). Submit asynchronously (omit wait or "
+                    "set wait=false) and poll GET /v1/runs/{job_id}."
+                ),
+            )
+
     payload = _decode_request(media, text)
 
     if wait:
