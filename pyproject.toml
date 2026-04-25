@@ -1,0 +1,67 @@
+[project]
+name = "tribe-backend"
+version = "0.0.1"
+description = "TRIBE v2 backend: parcellation + mesh export pipeline"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "nibabel>=5.2",
+    "nilearn>=0.10",
+    "matplotlib>=3.8",
+    "trimesh>=4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cases>=3.8",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.100",
+    "import-linter>=2.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tribe_backend*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "unit: fast unit tests (default)",
+    "integration: tests that load real atlases or fixtures from disk",
+    "slow: GLB export, full animation bundle",
+    "gpu: requires CUDA + tribev2 weights",
+]
+
+[tool.importlinter]
+root_packages = ["tribe_backend"]
+
+[[tool.importlinter.contracts]]
+name = "Compartment isolation"
+type = "forbidden"
+source_modules = [
+    "tribe_backend.parcellation",
+    "tribe_backend.mesh",
+    "tribe_backend.inference",
+]
+forbidden_modules = [
+    "tribe_backend.control",
+]
+
+[[tool.importlinter.contracts]]
+name = "Parcellation does not import mesh or inference"
+type = "forbidden"
+source_modules = ["tribe_backend.parcellation"]
+forbidden_modules = ["tribe_backend.mesh", "tribe_backend.inference"]
+
+[[tool.importlinter.contracts]]
+name = "Mesh does not import parcellation or inference"
+type = "forbidden"
+source_modules = ["tribe_backend.mesh"]
+forbidden_modules = ["tribe_backend.parcellation", "tribe_backend.inference"]
