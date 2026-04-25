@@ -89,3 +89,23 @@ Full output: `agent/reports/swift-brain-smoke-output.txt`
 | No dependency on tribev2 source (reference-only citations OK) | ✅ Camera presets and kNN reimplemented independently; no CC BY-NC code copied |
 
 **v0.1.0 is NOT tagged.** Tag and PR once macOS CI confirms `swift test` green on both targets.
+
+---
+
+## Documentation expansion (2026-04-25)
+
+Added four new sections to `swift/TribeBrainView/README.md` (appended after the
+existing Public API summary; existing install and quickstart content is unchanged):
+
+| Section | What it covers |
+|---|---|
+| **Server connection guide** | Base URL config and ATS `Info.plist` snippet; endpoint-by-endpoint reference table covering all 4 endpoints (`GET /v1/mesh/static`, `POST /v1/inference/colors`, `POST /v1/inference/full`, `GET /v1/inference/colors/{window_id}`); ETag protocol and `UserDefaults` key name; `AggregationMethod` wire-string mapping; `vmin`/`vmax`/`cmap` defaults; error semantics (`BrainMeshClientError` case mapping); polling backpressure model; CORS notes; 60-line end-to-end live-mode Swift snippet |
+| **Local artifact parsing and rendering** | Artifact directory layout with exact byte counts; `brain_meta.json` field reference table keyed against `ColormapMeta` Codable struct; SCNGeometrySource construction recipe with stride/offset/component details; offline artifact generation via `scripts/generate_swift_fixtures.py`; animation bundle `animation_meta.json` schema and `frameURL(at:)` clamping behavior; color-swap sequence diagram; camera preset reference table (9 presets with viewVector/upVector/fov); `BrainViewConfiguration` field table; bundling fixtures via SPM `.copy()` and Xcode Copy Bundle Resources; 30-line offline-mode Swift snippet |
+| **Troubleshooting** | vertex_count mismatch; 304 storm / stale ETag; multipart 422 field name; gray placeholder colors; normals-missing open issue |
+| **Versioning and compatibility** | `tribe_brain_mesh_v1` wire format constant and bump policy; platform minimums (iOS 16, macOS 13, visionOS 1); SceneKit-only status and RealityKit follow-up reference |
+
+New file created:
+
+- `swift/TribeBrainView/Examples/BrainViewerDemo/README.md` — 1-page note
+  pointing at the main README and listing the three demo scenarios (local
+  fixture, remote bootstrap, live polling toggle).
